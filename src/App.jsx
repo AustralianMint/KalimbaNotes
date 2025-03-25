@@ -71,7 +71,7 @@ function App() {
     }));
   };
 
-  // Export to PDF
+  // Export to PDF with color
   const exportToPDF = () => {
     const doc = new jsPDF();
     
@@ -79,25 +79,73 @@ function App() {
     doc.setFontSize(16);
     doc.text('Kalimba Notes', 20, 20);
     
-    // Split the colored notes into plain text
-    const plainTextNotes = notes;
-    
     // Add the notes
     doc.setFontSize(12);
     
-    // Split by newlines and add each line
-    const lines = plainTextNotes.split('\n');
+    // Process each line separately
+    const lines = notes.split('\n');
     let y = 30;
+    
+    // Regular expression to match note patterns (digit followed by optional primes)
+    const noteRegex = /(\d[']*)/g;
     
     lines.forEach(line => {
       if (y > 280) {
         doc.addPage();
         y = 20;
       }
-      doc.text(line, 20, y);
-      y += 7;
+      
+      // Find all matches and their positions
+      const matches = [...line.matchAll(new RegExp(noteRegex, 'g'))];
+      let lastIndex = 0;
+      let x = 20; // starting x position
+      
+      if (matches.length === 0) {
+        // No notes in this line, just print the text
+        doc.text(line, x, y);
+      } else {
+        // Process the line with colored notes
+        for (const match of matches) {
+          const noteIndex = match.index;
+          const note = match[0];
+          
+          // Text before the note
+          if (noteIndex > lastIndex) {
+            const textBefore = line.substring(lastIndex, noteIndex);
+            doc.setTextColor(0, 0, 0); // Black for regular text
+            const textWidth = doc.getTextWidth(textBefore);
+            doc.text(textBefore, x, y);
+            x += textWidth;
+          }
+          
+          // The note itself with color
+          const color = colorSettings[note] || '#000000';
+          // Convert hex to RGB
+          const r = parseInt(color.substring(1, 3), 16);
+          const g = parseInt(color.substring(3, 5), 16);
+          const b = parseInt(color.substring(5, 7), 16);
+          doc.setTextColor(r, g, b);
+          
+          const noteWidth = doc.getTextWidth(note);
+          doc.text(note, x, y);
+          x += noteWidth;
+          
+          lastIndex = noteIndex + note.length;
+        }
+        
+        // Text after the last note
+        if (lastIndex < line.length) {
+          const textAfter = line.substring(lastIndex);
+          doc.setTextColor(0, 0, 0); // Reset to black
+          doc.text(textAfter, x, y);
+        }
+      }
+      
+      y += 7; // Move to next line
     });
     
+    // Reset text color to black before saving
+    doc.setTextColor(0, 0, 0);
     doc.save('kalimba-notes.pdf');
   };
 
